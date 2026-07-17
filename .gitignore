@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+bienv
+
+# Environment variables (contains API keys)
+.env
+
+# Notebook checkpoint files
+.ipynb_checkpoints/
+
+# Generated outputs
+latency_comparison.png
+gateway_radar_chart.png
+benchmark_results.csv
+cost_analysis.csv
+split_notebooks.py
+llm_gateway_comparison_notebook_plan.md
+llm_gateway_comparison.ipynb
+build_notebook.py
+MCP_FIXES.md
