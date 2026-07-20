@@ -6,7 +6,7 @@
 
 Bifrost is a free, open-source gateway that sits between your app and the LLM providers you use — Groq, Mistral, OpenAI, Anthropic, and 20+ others. Instead of your code talking to each provider separately, it talks to Bifrost once, using one consistent API. Bifrost figures out which provider actually handles the request.
 
-Picture the RAG pipeline in Section 4 of our notebook: the final step, `rag_query()`, calls `bifrost_call(prompt, model)`. That one function can send the request to Groq or to Mistral just by changing the `model` string — nothing else in the RAG code changes. That's the whole point of a gateway: your application logic stays provider-agnostic.
+Picture the RAG pipeline in Section 4 of our notebook: the final step, `rag_query()`, calls `call_bifrost(prompt, model)`. That one function can send the request to Groq or to Mistral just by changing the `model` string — nothing else in the RAG code changes. That's the whole point of a gateway: your application logic stays provider-agnostic.
 
 You can run Bifrost three ways:
 
@@ -61,8 +61,8 @@ flowchart TD
 
 Two concrete examples of this pipeline in our notebook:
 
-- **The RAG answer call (Section 4.4)** — `rag_query()` builds a prompt with the retrieved Qdrant context, then calls `bifrost_call()`. That request flows through steps 1–3, skips step 4 entirely (no MCP tools involved), then goes straight to the provider and back.
-- **The agent demo (Section 3.8)** — asking "search the web for Groq news" *does* use step 4 (Tavily gets attached as an available tool) and step 8 (the tool actually runs, because Auto-execute is turned on) before the model can give its final answer.
+- **The RAG answer call (Section 4.4)** — `rag_query()` builds a prompt with the retrieved Qdrant context, then calls `call_bifrost()`. That request flows through steps 1–3, skips step 4 entirely (no MCP tools involved), then goes straight to the provider and back.
+- **The agent demo (Section 3.7)** — asking "search the web for Groq news" *does* use step 4 (Tavily gets attached as an available tool) and step 8 (the tool actually runs, because Auto-execute is turned on) before the model can give its final answer.
 
 If the primary provider fails or is unhealthy, step 2 is where Bifrost quietly switches to your configured fallback — before the request ever reaches a worker. That's the mechanism behind the failover demo in Section 3.2.
 

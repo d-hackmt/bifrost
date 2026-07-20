@@ -1,6 +1,6 @@
 # Terminology Reference
 
-A plain-language glossary of every term used across this repo. Wherever it helps, each definition includes a quick example tied to the **RAG pipeline** (Section 4 of the notebook: Jina embeddings → Qdrant → Bifrost) or the **agent/MCP demo** (Section 3.8: Bifrost + DeepWiki/Tavily), since that's the concrete system these terms show up in.
+A plain-language glossary of every term used across this repo. Wherever it helps, each definition includes a quick example tied to the **RAG pipeline** (Section 4 of the notebook: Jina embeddings → Qdrant → Bifrost) or the **agent/MCP demo** (Section 3.7: Bifrost + DeepWiki/Tavily), since that's the concrete system these terms show up in.
 
 ---
 
@@ -18,15 +18,15 @@ A plain-language glossary of every term used across this repo. Wherever it helps
 
 **Fine-tuning** — Retraining a model on your own data so its default behavior permanently changes. Think of it as sending the model to school on your data. **RAG** (below) is the opposite approach: instead of retraining anything, you hand the model your notes right before it answers.
 
-**Reasoning content** — Some models (like Groq's `openai/gpt-oss-*` models used here) think out loud internally before answering, and that "thinking trace" gets attached to the response. It's the exact reason Section 3.8's agent demo breaks on Groq: Bifrost tries to resend that trace on the next turn, and Groq's API rejects it.
+**Reasoning content** — Some models (like Groq's `openai/gpt-oss-*` models used here) think out loud internally before answering, and that "thinking trace" gets attached to the response. It's the exact reason Section 3.7's agent demo breaks on Groq: Bifrost tries to resend that trace on the next turn, and Groq's API rejects it.
 
 **Hallucination** — The model states something wrong, but confidently. *Example:* in a RAG app this looks like the model answering from something that was never actually in the retrieved documents — it made it up instead of saying "I don't know."
 
 **Function calling / tool calling** — Letting the model say "run this function for me" instead of just replying with text, then feeding it the function's result. This is the mechanism underneath every agent and every MCP call.
 
-**Agent** — An LLM that can take more than one step toward an answer — call a tool, look at the result, decide what to do next, maybe call another tool, then finally answer. *Example:* in Section 3.8, asking "search the web for the latest Groq news" isn't answered from memory — the model recognizes it needs the Tavily tool, calls it, reads the search results, then writes the summary. That loop is what makes it an agent instead of a single LLM call.
+**Agent** — An LLM that can take more than one step toward an answer — call a tool, look at the result, decide what to do next, maybe call another tool, then finally answer. *Example:* in Section 3.7, asking "search the web for the latest Groq news" isn't answered from memory — the model recognizes it needs the Tavily tool, calls it, reads the search results, then writes the summary. That loop is what makes it an agent instead of a single LLM call.
 
-**MCP (Model Context Protocol)** — A standard way for a model to discover and call outside tools (web search, a database, a filesystem) without every app having to build its own custom plumbing for each tool. DeepWiki and Tavily in Section 3.8 are both MCP tools.
+**MCP (Model Context Protocol)** — A standard way for a model to discover and call outside tools (web search, a database, a filesystem) without every app having to build its own custom plumbing for each tool. DeepWiki and Tavily in Section 3.7 are both MCP tools.
 
 **MCP Code Mode** — Instead of describing available tools to the model as a big JSON blob, Bifrost can describe them as short TypeScript function signatures. Same information, far fewer tokens — matters once an agent has a lot of tools to choose from.
 
@@ -38,11 +38,11 @@ A plain-language glossary of every term used across this repo. Wherever it helps
 
 **RAG (Retrieval-Augmented Generation)** — The pattern: don't trust the model's memory, go fetch the real facts first, then ask it to answer using only those facts. Section 4 builds this step by step: embed the question → search Qdrant → hand the top matches to Groq/Mistral as context.
 
-**Embedding** — A numeric fingerprint for a piece of text. Texts with similar meaning get similar fingerprints, even if they don't share any of the same words. `jina_embed()` in the notebook is what produces these.
+**Embedding** — A numeric fingerprint for a piece of text. Texts with similar meaning get similar fingerprints, even if they don't share any of the same words. The notebook's `JinaEmbeddings` class (Section 4.2) produces these — it implements LangChain's standard `Embeddings` interface, so it plugs straight into the vector store below.
 
-**Vector store / vector database** — A database purpose-built to store these fingerprints and quickly find the closest ones to a given query. Qdrant Cloud is the vector store here.
+**Vector store / vector database** — A database purpose-built to store these fingerprints and quickly find the closest ones to a given query. Qdrant Cloud is the vector store here, wrapped in `langchain_qdrant.QdrantVectorStore` (Section 4.3) rather than called through the raw Qdrant client directly.
 
-**Cosine similarity / distance** — The method used to compare two fingerprints: it checks how much they "point in the same direction," ignoring their size. `Distance.COSINE` in `cell-49` sets this as the comparison rule for the Qdrant collection.
+**Cosine similarity / distance** — The method used to compare two fingerprints: it checks how much they "point in the same direction," ignoring their size. `Distance.COSINE` (Section 4.3) sets this as the comparison rule for the Qdrant collection.
 
 **`top_k`** — How many of the closest matches to pull back from the vector store. `top_k=3` in `rag_query()` means "give me the 3 best-matching documents, not all of them."
 
@@ -103,11 +103,11 @@ A plain-language glossary of every term used across this repo. Wherever it helps
 
 **Concurrency** — How many requests are being handled *at the same moment* — like how many cashiers are open at once, regardless of how fast each one checks a customer out.
 
-**Observability** — Being able to tell what a running system is actually doing — via logs, metrics, and traces — instead of guessing. `check_bifrost_health()` and `bifrost_get_logs()` in the notebook are a minimal version of this.
+**Observability** — Being able to tell what a running system is actually doing — via logs, metrics, and traces — instead of guessing. Sections 0.3 (health check) and 3.5 (logs API) in the notebook are a minimal version of this.
 
 **Distributed tracing** — Following one request as it moves through multiple steps, so you can see exactly which step was slow. *Example:* in an agent call (plan → search tool → generate answer), a trace shows you which of those three steps actually ate the 4 seconds — instead of just knowing the total was 4 seconds.
 
-**OpenTelemetry (OTel) / OTLP** — An open, vendor-neutral standard for emitting metrics/logs/traces so tools like Jaeger or Datadog can read them. Referenced in Section 3.6 but not actually wired up to anything there.
+**OpenTelemetry (OTel) / OTLP** — An open, vendor-neutral standard for emitting metrics/logs/traces so tools like Jaeger or Datadog can read them. The notebook doesn't wire this up — it needs a collector running, which is outside this getting-started setup — see the "not covered" note after Section 3.7.
 
 **Prometheus** — A widely-used open-source system for collecting and querying metrics. `/metrics` is its standard endpoint. Section 3.5 notes this needs a separate plugin in Bifrost.
 

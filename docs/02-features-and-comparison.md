@@ -11,7 +11,7 @@
 - Drop-in replacement — swap a base URL, keep your existing OpenAI SDK code exactly as-is
 
 **Built for agents**
-- MCP gateway — one place to register tools (web search, a database, DeepWiki, Tavily) so every agent behind Bifrost shares the same governed tool access, instead of every app team wiring up its own MCP client from scratch. This is exactly what Section 3.8's demo uses.
+- MCP gateway — one place to register tools (web search, a database, DeepWiki, Tavily) so every agent behind Bifrost shares the same governed tool access, instead of every app team wiring up its own MCP client from scratch. This is exactly what Section 3.7's demo uses.
 - MCP "Code Mode" — describes tools to the model as short TypeScript signatures instead of bulky JSON, saving tokens once an agent has a lot of tools to pick from
 - Semantic caching — recognizes when two questions mean the same thing (like `duplicate1`/`duplicate2` in the notebook) and reuses the answer instead of calling the LLM twice
 - Custom plugin system — write your own pre/post hooks in Go for auth, logging, transforms, or mocking
