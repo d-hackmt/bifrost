@@ -1,26 +1,28 @@
-# Bifrost OSS (Self-Hosted, Free) vs. Bifrost Enterprise
+# Bifrost Free (Self-Hosted) vs. Bifrost Enterprise
 
-## The framing that actually matters
+*Terms you don't recognize below are in [00-terminologies.md](00-terminologies.md).*
 
-This isn't "self-hosted vs. hosted." **Both tiers are self-hostable** — Enterprise doesn't take away your ability to run Bifrost on your own infrastructure; it adds deployment flexibility (VPC-isolated, air-gapped, multi-cloud) plus a set of features that are gated behind a commercial license rather than shipped under the Apache 2.0 core.
+## The distinction that actually matters
 
-So the real question per feature is: *is this part of the open-source gateway, or is it a paid add-on on top of it?*
+This is **not** "self-hosted vs. hosted for you." You can self-host both tiers. Enterprise adds deployment flexibility (isolated VPC, air-gapped, multi-cloud) plus a set of features gated behind a paid license, on top of the same open-source (Apache 2.0) core.
+
+So the real question, feature by feature, is: *is this part of the free gateway, or is it a paid add-on?*
 
 ```mermaid
 flowchart TD
-    subgraph OSS["OSS core (Apache 2.0, free forever)"]
+    subgraph OSS["Free core (Apache 2.0, self-hosted)"]
         A[Gateway + unified API]
         B[Routing, failover, load balancing]
         C[Virtual keys, budgets, rate limits]
-        D[Built-in observability, Prometheus, OTel]
+        D[Built-in dashboard, Prometheus, OTel]
         E[MCP gateway, semantic caching]
     end
     subgraph ENT["Enterprise (adds on top)"]
         F[SSO / SAML / RBAC]
         G[Guardrails: PII, prompt injection, content safety]
         H[Secrets vault integration]
-        I[Clustering / HA / adaptive load balancing]
-        J[Audit logs, log export, external OTel connectors]
+        I[Clustering / high availability]
+        J[Audit logs, log export]
         K[In-VPC / air-gapped deployment, SLA support]
     end
     OSS --> ENT
@@ -28,53 +30,45 @@ flowchart TD
 
 ## Full comparison
 
-| Category | Capability | OSS (Free) | Enterprise |
+| Category | Capability | Free | Enterprise |
 |---|---|:---:|:---:|
-| **Core gateway** | Single OpenAI-compatible API | ✅ | ✅ |
-| | Drop-in replacement | ✅ | ✅ |
-| | Custom routing rules & flows | ✅ | ✅ |
-| | Automatic fallbacks | ✅ | ✅ |
-| **Observability** | Built-in dashboard / Logs API | ✅ | ✅ |
-| | Prometheus metrics | ✅ | ✅ |
-| | OpenTelemetry / OTLP | ✅ | ✅ |
-| | External OTel connectors | ❌ | ✅ |
-| | Log export (SIEM, compliance tooling) | ❌ | ✅ |
-| **Governance & access** | Virtual keys | ✅ | ✅ |
-| | Budgets & rate limits | ✅ | ✅ |
-| | Required-header enforcement | ✅ | ✅ |
-| | SAML / OIDC SSO | ❌ | ✅ |
-| | Role-based access control (RBAC) | ❌ | ✅ |
-| | Audit logs | ❌ | ✅ |
-| **Security & secrets** | Env-var based secrets | ✅ | ✅ |
-| | Vault integration (HashiCorp, AWS, GCP, Azure) | ❌ | ✅ |
-| | Guardrails (PII, content safety, prompt injection, jailbreak, hallucination detection) | ❌ | ✅ |
-| | Identity provider integration (Okta, Entra ID) | ❌ | ✅ |
-| **Reliability** | Basic failover & load balancing | ✅ | ✅ |
-| | Clustering (multi-node HA) | ❌ | ✅ |
-| | Adaptive load balancing (real-time performance-based routing) | ❌ | ✅ |
-| **Agent / MCP** | MCP gateway, code mode, tool filtering | ✅ | ✅ |
-| | MCP with federated auth (per-identity tool permissions) | ❌ | ✅ |
-| **AI features** | Semantic caching | ✅ | ✅ |
-| | Prompt repository / playground | ✅ | ✅ |
-| | Custom plugin development | ✅ | ✅ |
+| **Core gateway** | Single API, drop-in replacement, routing, fallbacks | ✅ | ✅ |
+| **Seeing what's happening** | Dashboard, Logs API, Prometheus, OpenTelemetry | ✅ | ✅ |
+| | Exporting logs to your own tools (SIEM, compliance systems) | ❌ | ✅ |
+| **Controlling spend & access** | Virtual keys, budgets, rate limits | ✅ | ✅ |
+| | Login through your company's SSO (SAML/OIDC) | ❌ | ✅ |
+| | Role-based permissions (who can do what) | ❌ | ✅ |
+| | Audit logs for compliance | ❌ | ✅ |
+| **Keeping secrets safe** | Env-var based secrets | ✅ | ✅ |
+| | Storing keys in a proper vault (HashiCorp, AWS, GCP, Azure) | ❌ | ✅ |
+| **Checking content is safe** | Guardrails: catching PII, prompt injection, unsafe content, hallucinations | ❌ | ✅ |
+| **Staying up under load** | Basic failover & load balancing | ✅ | ✅ |
+| | Multi-node clustering for high availability | ❌ | ✅ |
+| | Traffic auto-tuned to real-time performance | ❌ | ✅ |
+| **Agent tooling** | MCP gateway, code mode, tool filtering | ✅ | ✅ |
+| | Per-team/per-identity tool permissions | ❌ | ✅ |
 | **Support** | Community (Discord) | ✅ | ❌ |
-| | SLA-backed professional support | ❌ | ✅ |
-| | Dedicated channels (Slack/Teams), architecture & rollout help | ❌ | ✅ |
-| **Deployment** | Docker / Kubernetes / single binary, self-hosted anywhere | ✅ | ✅ |
-| | In-VPC managed deployment, air-gapped, multi-cloud with native IAM | ❌ | ✅ |
+| | Guaranteed support response times (SLA) | ❌ | ✅ |
 
-## The practical read
+## What this means in practice
 
-For our `bifrost_experiment.ipynb` setup — a single Docker container, Groq + Mistral, no SSO, no compliance mandate — **everything used is in the free OSS tier**: virtual keys, MCP gateway, failover, load balancing, observability. Nothing in that notebook touches an Enterprise-only feature.
+Our `bifrost_experiment.ipynb` setup — one Docker container, Groq + Mistral, no company SSO, no compliance requirement — **uses nothing outside the free tier**: virtual keys, MCP gateway, failover, load balancing, built-in observability all work exactly as shown, for free.
 
-The line where teams typically pay for Enterprise is not "we want to self-host" (OSS already does that) — it's one of:
+Where teams actually start paying for Enterprise, in practice:
 
-1. **Regulatory/compliance pressure** — you need SOC 2 / HIPAA / GDPR-grade audit trails and guardrails, not just logs.
-2. **Organizational identity** — you need SSO tied into Okta/Entra and RBAC instead of everyone sharing gateway access.
-3. **Availability guarantees** — you need multi-node clustering and an SLA, not a single container that's down if it's down.
-4. **Secrets hygiene at scale** — provider keys need to live in Vault/Secrets Manager, not an `.env` file, because more than one team touches the gateway.
+1. **A regulator or auditor is asking questions.** You need audit trails and content-safety checks that hold up as real evidence, not just app logs.
+2. **More than one team uses the gateway.** You need real SSO and role-based access, not everyone sharing one login.
+3. **Downtime is expensive.** You need multi-node failover for the gateway itself, plus a support contract with a guaranteed response time.
+4. **Provider keys need to live somewhere safer than an `.env` file** — once multiple teams touch the gateway, a proper secrets vault stops being optional.
 
-None of those are performance features — the free tier already gets the full speed and routing engine described in [doc 01](01-what-is-bifrost.md). Enterprise is priced around *governance, compliance, and support*, not raw throughput.
+### A concrete RAG example of where the line falls
+
+Say you extend Section 4's RAG pipeline into a real product: customer support tickets get embedded and stored in Qdrant, and support agents query them through Bifrost.
+
+- **Free tier is enough if:** it's your team only, you control what goes into the knowledge base, and you just want to track spend per environment (dev vs. prod) using virtual key budgets.
+- **You need Enterprise once:** the tickets contain customer PII (emails, order numbers, phone numbers) and you need those *redacted before they ever reach the model* — that's a guardrail, not a budget control. Or once support and engineering both need access but shouldn't see each other's virtual keys — that's RBAC, not something budgets alone solve.
+
+None of this is about speed — the full routing and performance engine from [doc 01](01-what-is-bifrost.md) is already in the free tier. Enterprise is priced around *governance, compliance, and support*, not throughput.
 
 ## Sources
 

@@ -1,25 +1,20 @@
 # AI Governance, and What Bifrost Lets You Achieve at Each Tier
 
+*Terms you don't recognize below are in [00-terminologies.md](00-terminologies.md).*
+
 ## What "AI governance" actually means
 
-AI governance is the set of policies, controls, and processes that ensure AI systems are used **safely, cost-effectively, accountably, and in compliance with regulation** — as opposed to every team calling model APIs however they want with no shared oversight. It's the same instinct as IT governance or data governance, applied to a category of infrastructure that's newer and riskier because its behavior isn't fully predictable and its inputs/outputs are unstructured text.
+AI governance is just having real answers to a few basic questions about how your org uses AI, instead of every team doing whatever it wants with no oversight:
 
-The most widely referenced framework is **NIST's AI Risk Management Framework (AI RMF)**, built around four functions:
+1. **Cost** — who's spending what, and can any one team or key blow through the budget unchecked?
+2. **Access** — who's allowed to call which models or providers, and can you cut them off if needed?
+3. **Visibility** — can you actually see what's being sent and received across the org?
+4. **Safety** — is unsafe or sensitive content getting blocked before it causes damage?
+5. **Accountability** — if something goes wrong, can you prove what happened, to an auditor or regulator?
 
-- **Govern** — organizational culture, leadership accountability, and policy for how AI is used
-- **Map** — understanding where and how AI systems are deployed, and their context/impact
-- **Measure** — quantifying risk (bias, safety, reliability) with real metrics
-- **Manage** — actually responding to and mitigating identified risks
+The most commonly referenced framework for this is **NIST's AI Risk Management Framework**, built around four steps: **Govern** (set the policy and culture), **Map** (understand where AI is actually being used), **Measure** (quantify the risk with real numbers), and **Manage** (actually act on it). Bifrost's features map cleanly onto the practical, day-to-day version of this.
 
-In practice, for a team running LLMs in production, governance breaks down into five concrete, answerable questions:
-
-1. **Cost** — who's spending what, and can any team/key blow the budget unchecked?
-2. **Access** — who is allowed to call which models/providers, and can that be revoked?
-3. **Visibility** — can you see what's actually being sent and received across the org?
-4. **Safety** — is unsafe or sensitive content being blocked before it does damage?
-5. **Accountability** — if something goes wrong, can you prove what happened and when, for an auditor or regulator?
-
-## Mapping governance to Bifrost
+## How this maps onto Bifrost
 
 ```mermaid
 flowchart TD
@@ -29,12 +24,12 @@ flowchart TD
     G --> S["Safety"]
     G --> ACC["Accountability"]
 
-    C --> C1["Virtual keys + hierarchical\nbudgets (team/customer/key)"]
+    C --> C1["Virtual keys + budgets\n(per team / customer / key)"]
     A --> A1["Virtual keys scope which\nmodels/providers a caller can reach"]
-    A --> A2["SSO + RBAC\n(org identity-based)"]
-    V --> V1["Built-in dashboard, Logs API,\nPrometheus, OpenTelemetry"]
+    A --> A2["SSO + role-based access\n(tied to your org's identity system)"]
+    V --> V1["Built-in dashboard, logs,\nPrometheus, OpenTelemetry"]
     S --> S1["Guardrails: PII, prompt injection,\ncontent safety, hallucination"]
-    ACC --> ACC1["Immutable audit logs\n(SOC 2 / GDPR / HIPAA / ISO 27001)"]
+    ACC --> ACC1["Tamper-evident audit logs\n(SOC 2 / GDPR / HIPAA / ISO 27001)"]
 
     classDef free fill:#d4edda,stroke:#28a745
     classDef ent fill:#fff3cd,stroke:#d39e00
@@ -42,40 +37,47 @@ flowchart TD
     class A2,S1,ACC1 ent
 ```
 
-## What's achievable on the free (OSS) tier
+## What you get for free
 
-Bifrost's free tier already covers real governance, not just routing:
+**Cost control.** Give each team or use case its own virtual key with a hard budget and rate limit. *Example: give your RAG pipeline's dev environment one virtual key with a $50/month cap, and prod a separate key with a much higher one — a bug in dev can't accidentally rack up your production bill.*
 
-- **Cost governance** — virtual keys carry their own budget and rate limit, at team/customer/key granularity. You can hand a teammate a key that hard-caps their spend without touching anyone else's.
-- **Basic access governance** — a virtual key scopes exactly which providers/models a caller can reach; revoking one key doesn't require rotating the shared provider credential everyone else uses.
-- **Usage visibility** — the built-in dashboard, Logs API, Prometheus metrics, and OpenTelemetry give you a real picture of what's being called, by whom, how often, and at what latency/cost — without adding your own logging.
-- **Tool governance (basic)** — the MCP gateway centralizes which tools are registered and available to agents, with tool filtering, instead of every application independently deciding what an agent can touch.
+**Basic access control.** A virtual key only reaches the providers/models you scope it to, and you can revoke one key without touching anyone else's.
 
-This is enough for a single team or small org that wants cost discipline and observability but doesn't have a compliance mandate.
+**Visibility.** The built-in dashboard, Logs API, Prometheus metrics, and OpenTelemetry give you a real picture of what's being called, how often, and at what cost — without writing your own logging.
 
-## What requires Enterprise
+**Basic tool governance.** The MCP gateway keeps tool registration in one place with filtering, instead of every application deciding for itself what an agent is allowed to touch.
 
-- **Safety governance** — the guardrails system (PII detection/redaction, prompt-injection detection, content-safety filtering, hallucination detection) is what actually inspects and controls *content*, not just usage. Free-tier governance controls *who can spend how much*; it does not control *what gets said*.
-- **Organizational access governance** — SSO (SAML/OIDC via Okta, Entra ID) and RBAC tie gateway access to your real identity system and role structure, instead of virtual keys being manually distributed and tracked.
-- **Accountability / compliance evidence** — immutable audit logs suitable as SOC 2, GDPR, HIPAA, and ISO 27001 evidence. Free-tier logs tell you *what happened*; Enterprise audit logs are built to be *trusted by an external auditor*.
-- **Federated tool governance** — MCP with per-identity tool permissions, rather than one shared tool-access policy for every agent behind the gateway.
-- **Log export** — pushing logs/traces into an external SIEM or compliance pipeline, rather than only viewing them in Bifrost's own dashboard.
+This is genuinely enough for a single team that wants cost discipline and visibility but has no compliance requirement — exactly the kind of setup our notebook uses.
+
+## What needs Enterprise
+
+**Actually checking content, not just usage.** Free-tier governance controls *who can spend how much*. It does not look at *what's actually being said*. Guardrails (PII detection, prompt-injection detection, content-safety filtering) are the part that inspects the real content of a request or response.
+
+*RAG example:* imagine your RAG knowledge base includes internal documents that mention employee salaries. Free-tier virtual keys can control *which team* can query that index — but only a guardrail can catch and redact a salary figure that shows up in the model's *answer* before it reaches the end user.
+
+**Access tied to your real org structure.** SSO (SAML/OIDC) and RBAC connect gateway access to your actual identity system and roles, instead of you manually handing out and tracking virtual keys one by one.
+
+**Proof, not just logs.** Free-tier logs tell you what happened. Enterprise audit logs are built specifically to be trusted by an outside auditor for SOC 2, GDPR, HIPAA, or ISO 27001.
+
+**Per-identity tool permissions.** *Agent example:* with the free MCP gateway, every agent behind it shares the same tool-access policy. With federated auth, the support team's agent can query a customer database tool, while the marketing team's agent — going through the exact same gateway — simply can't.
+
+**Getting logs out to your own systems.** Pushing logs and traces into an external SIEM or compliance pipeline, instead of only viewing them inside Bifrost's own dashboard.
 
 ## Governance capability by tier
 
-| Governance pillar | Bifrost mechanism | Free (OSS) | Enterprise |
+| Governance pillar | How Bifrost does it | Free | Enterprise |
 |---|---|:---:|:---:|
-| Cost | Virtual keys, hierarchical budgets, rate limits | ✅ | ✅ |
-| Access (key-level) | Virtual key scoping, revocation | ✅ | ✅ |
-| Access (org-level) | SSO (SAML/OIDC), RBAC | ❌ | ✅ |
-| Visibility | Dashboard, Logs API, Prometheus, OTel | ✅ | ✅ (+ external export) |
-| Safety | Guardrails: PII, prompt injection, content safety, hallucination | ❌ | ✅ |
-| Tool governance | MCP gateway, tool filtering | ✅ (basic) | ✅ (+ federated auth) |
-| Accountability | Immutable, compliance-grade audit trail | ❌ | ✅ |
+| Cost | Virtual keys, budgets, rate limits | ✅ | ✅ |
+| Access (per key) | Scoping and revoking virtual keys | ✅ | ✅ |
+| Access (org-wide) | SSO, role-based permissions | ❌ | ✅ |
+| Visibility | Dashboard, logs, Prometheus, OTel | ✅ | ✅ (+ export to your own tools) |
+| Safety | Guardrails: PII, injection, content safety, hallucination | ❌ | ✅ |
+| Tool governance | MCP gateway with filtering | ✅ (shared policy) | ✅ (per-identity) |
+| Accountability | Audit trail built for outside auditors | ❌ | ✅ |
 
 ## The honest summary
 
-Free-tier Bifrost gives you **operational governance** — you can see what's happening and control who spends what. Enterprise adds **content governance and compliance governance** — controlling what the model is allowed to say or see, and proving that control held, to a standard an external auditor accepts. If your risk is "someone runs up a huge bill" or "I have no idea what's being called," the free tier solves it. If your risk is "this model might leak a customer's SSN" or "we need SOC 2 to close an enterprise deal," that's the tier where Enterprise stops being optional.
+The free tier gives you **operational** governance — you can see what's happening and control who spends what. Enterprise adds **content** governance and **compliance** governance — controlling what the model is allowed to say or see, and being able to prove that control actually held. If your worry is "someone might run up a huge bill" or "I have no idea what's being called," the free tier already solves it. If your worry is "this model might leak something it shouldn't" or "we need SOC 2 to close a deal," that's exactly where Enterprise stops being optional.
 
 ## Sources
 

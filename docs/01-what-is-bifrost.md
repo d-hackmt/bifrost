@@ -1,71 +1,74 @@
 # What Is Bifrost, and Why Is It So Fast?
 
+*Terms you don't recognize below are in [00-terminologies.md](00-terminologies.md).*
+
 ## What Bifrost is
 
-Bifrost is an open-source (Apache 2.0) AI gateway built by Maxim AI. It sits between your application and the LLM providers you call — OpenAI, Anthropic, AWS Bedrock, Google Vertex, Azure, Groq, Mistral, Cohere, Ollama, and 15+ others (23+ providers total, 1000+ models) — and exposes all of them through **one OpenAI-compatible API**. Your code talks to Bifrost the same way it would talk to OpenAI; which provider actually serves the request is a routing decision Bifrost makes, not something your application needs to know.
+Bifrost is a free, open-source gateway that sits between your app and the LLM providers you use — Groq, Mistral, OpenAI, Anthropic, and 20+ others. Instead of your code talking to each provider separately, it talks to Bifrost once, using one consistent API. Bifrost figures out which provider actually handles the request.
 
-Three ways to run it:
+Picture the RAG pipeline in Section 4 of our notebook: the final step, `rag_query()`, calls `bifrost_call(prompt, model)`. That one function can send the request to Groq or to Mistral just by changing the `model` string — nothing else in the RAG code changes. That's the whole point of a gateway: your application logic stays provider-agnostic.
 
-- **Gateway (HTTP API)** — a standalone process (Docker, NPX, or a single binary) with a Web UI, REST API, and config file. Language-agnostic — any HTTP client can use it. This is how our [bifrost_experiment.ipynb](../bifrost_experiment.ipynb) notebook uses it.
-- **Go SDK** — embed Bifrost directly inside a Go service instead of running it as a separate process.
-- **Drop-in replacement** — point an existing OpenAI/Anthropic SDK at Bifrost's base URL and change nothing else.
+You can run Bifrost three ways:
 
-The core pitch is simple: instead of writing separate error handling, retry logic, and client code for every provider, you write it once against Bifrost, and Bifrost absorbs the differences between providers.
+- **As a gateway (HTTP API)** — a standalone Docker container or binary with a Web UI. This is what our notebook uses.
+- **As a Go SDK** — embedded directly inside a Go service, no separate process.
+- **As a drop-in replacement** — point your existing OpenAI SDK at Bifrost's URL and change nothing else in your code.
 
-## Why "ultrafast" is a real claim, not marketing
+## Why "ultrafast" isn't just marketing
 
-Bifrost's headline number is **11 microseconds of added latency at 5,000 requests/second** (on an AWS t3.xlarge). The comparison point the project measures itself against is **LiteLLM**, the most widely used open-source alternative, which is written in Python.
+Bifrost's headline number: it adds only **11 microseconds** of its own delay per request, even at 5,000 requests/second. The comparison point is **LiteLLM**, the most popular open-source alternative, which is written in Python.
 
-That comparison is where the speed claim actually comes from, and it's architectural, not incidental:
+That gap comes down to one core difference: Bifrost is written in Go, LiteLLM in Python. Here's what that actually looks like in numbers, from a real benchmark (500 concurrent users, 60s, same hardware, same fake upstream response):
 
-| | Bifrost | LiteLLM |
-|---|---|---|
-| Language / runtime | Go — compiled, native concurrency via goroutines | Python — GIL-bound, asyncio overhead under concurrent load |
-| P50 latency @ 500 RPS | 804 ms | 38.65 s |
-| P99 latency @ 500 RPS | 1.68 s | 90.72 s |
-| Throughput | 424 req/s | 44.84 req/s |
-| Memory | 120 MB | 372 MB |
-| Success rate | 100% | 88.78% |
-| Gateway overhead (isolated) | 0.99 ms | 40 ms |
+| | Bifrost | LiteLLM | Difference |
+|---|---|---|---|
+| Median latency (P50) | 804 ms | 38.65 s | 48x faster |
+| Worst-case latency (P99) | 1.68 s | 90.72 s | 54x faster |
+| Requests handled per second | 424 | 44.84 | 9.5x more |
+| Memory used | 120 MB | 372 MB | 68% less |
+| Requests that succeeded | 100% | 88.78% | — |
 
-*(500 concurrent virtual users, 60s duration, AWS t3.medium, 60ms mocked upstream response — [Bifrost vs LiteLLM benchmark](https://www.getmaxim.ai/bifrost/resources/benchmarks).)*
+*([Full benchmark](https://www.getmaxim.ai/bifrost/resources/benchmarks).)* Push the load even higher and the gap gets worse for LiteLLM, not better — at 1,000 RPS it runs out of memory and crashes, while Bifrost stays stable. At Bifrost's own stress test (5,000 RPS, bigger ~10KB responses), it's still holding 11µs of overhead with zero failed requests.
 
-At higher load the gap gets more dramatic, not less: at 1,000 RPS LiteLLM runs out of memory and crashes, while Bifrost keeps a P99 of ~1.2s. At Bifrost's own stress ceiling — 5,000 RPS with ~10KB responses on a t3.xlarge — it holds 11µs of overhead and a 100% success rate.
+**What actually causes this, in plain terms:**
 
-**Where that speed actually comes from**, mechanically:
+1. **Go vs. Python.** Python has a rule (the GIL) that only lets one thread run Python code at a time, even on a machine with 16 cores. Go doesn't have that limitation — it can genuinely do many things at once.
+2. **A faster way of reading requests.** Bifrost parses an incoming request in about 2 microseconds, using a stripped-down, high-speed HTTP layer instead of a general-purpose Python web framework.
+3. **Picking a provider key is instant, no matter how many you have.** Whether you've configured 1 API key or 50, choosing which one to use takes the same tiny amount of time (~10 nanoseconds).
+4. **It reuses memory instead of constantly allocating new memory.** Every request doesn't create a pile of garbage for the system to clean up later — buffers get reused. This is a big reason memory usage stays flat under load instead of climbing.
+5. **A broken provider gets skipped, not retried into oblivion.** If Groq starts failing, Bifrost notices and stops sending it traffic for a bit, instead of every single request individually waiting and timing out against it.
+6. **A fixed set of workers handles the load**, rather than spinning up unlimited threads that eventually overwhelm the machine.
 
-1. **Go instead of Python.** No GIL. Concurrent requests run on real OS threads via goroutines instead of contending for a single interpreter lock.
-2. **`FastHTTP` transport.** Request parsing is measured in low single-digit microseconds (~2.1µs) rather than going through a general-purpose Python web framework.
-3. **O(1) key/provider selection.** Weighted random selection across API key pools is a constant-time operation (~10ns) — routing decisions don't get slower as you add more keys or providers.
-4. **Object pooling.** Channels, message buffers, and response objects are pre-allocated and reused instead of being garbage-collected on every request — this is most of why memory usage stays flat under load instead of growing with LiteLLM's Python object churn.
-5. **Circuit breakers instead of blocking retries.** A failing provider is marked unhealthy and skipped, rather than every in-flight request individually timing out against it.
-6. **Worker pools.** A fixed pool of workers pulls jobs off a queue rather than spawning unbounded goroutines/threads per request.
+## What actually happens to a request
 
-## Request flow
-
-Every request through the Bifrost gateway moves through the same nine-stage pipeline:
+Every call through Bifrost goes through the same nine steps:
 
 ```mermaid
 flowchart TD
-    A["Client request\n(OpenAI-compatible JSON)"] --> B["1. Transport\nFastHTTP parses + validates\n(~2.1µs)"]
-    B --> C["2. Routing & load balancing\nweighted key selection O(1),\ncircuit breaker health check"]
-    C --> D["3. Plugin pre-hooks\nauth, rate limit, guardrails,\nrequest transforms"]
-    D --> E["4. MCP tool injection\n(if agent tools are configured)"]
-    E --> F["5. Object pool acquire\nbuffers reused, not allocated"]
-    F --> G["6. Worker pool\npicks up the job"]
-    G --> H["7. Provider call\nOpenAI / Anthropic / Bedrock / ..."]
-    H --> I{"Tool calls\nin response?"}
-    I -- yes --> J["8. MCP tool execution\n(concurrent)"]
-    I -- no --> K["9. Plugin post-hooks\nlogging, caching, metrics,\naudit trail"]
+    A["Client request\n(OpenAI-compatible JSON)"] --> B["1. Parse & validate\n(~2µs)"]
+    B --> C["2. Pick a provider + key\n(instant, checks health)"]
+    C --> D["3. Run pre-checks\nauth, rate limits, guardrails"]
+    D --> E["4. Attach agent tools\n(only if MCP is enabled)"]
+    E --> F["5. Grab reusable memory buffers"]
+    F --> G["6. Hand off to a free worker"]
+    G --> H["7. Call the actual provider\n(Groq / Mistral / etc.)"]
+    H --> I{"Did the model\nask to use a tool?"}
+    I -- yes --> J["8. Run the tool(s)"]
+    I -- no --> K["9. Log, cache, record metrics"]
     J --> K
     K --> L["Response back to client"]
 ```
 
-If the primary provider fails (5xx, 429, or 401) or is marked unhealthy by the circuit breaker, step 2 re-routes to a configured fallback model/provider before the request ever reaches step 6 — this is the mechanism behind the failover feature shown in [Section 3.2](../bifrost_experiment.ipynb) of the notebook.
+Two concrete examples of this pipeline in our notebook:
 
-## Why this matters in practice, not just in benchmarks
+- **The RAG answer call (Section 4.4)** — `rag_query()` builds a prompt with the retrieved Qdrant context, then calls `bifrost_call()`. That request flows through steps 1–3, skips step 4 entirely (no MCP tools involved), then goes straight to the provider and back.
+- **The agent demo (Section 3.8)** — asking "search the web for Groq news" *does* use step 4 (Tavily gets attached as an available tool) and step 8 (the tool actually runs, because Auto-execute is turned on) before the model can give its final answer.
 
-A gateway that adds 40ms+ of its own overhead is invisible at low request volume — nobody notices an extra 40ms on a 2-second LLM call. It stops being invisible the moment you're running many concurrent agents, a production chat product, or anything doing high-frequency tool-calling loops, where the gateway's own tax gets paid on every single hop. Bifrost's architecture is specifically aimed at keeping that tax close to zero even as concurrency scales — which is the actual, practical meaning behind "50x faster than LiteLLM."
+If the primary provider fails or is unhealthy, step 2 is where Bifrost quietly switches to your configured fallback — before the request ever reaches a worker. That's the mechanism behind the failover demo in Section 3.2.
+
+## Why the speed actually matters
+
+A gateway adding 40ms of its own delay is invisible if your whole request already takes 2 seconds — nobody notices. It stops being invisible the moment you're running an **agent** that calls the LLM 4 or 5 times in a loop for one user question (plan → search → re-plan → answer): now that 40ms gets paid on every single hop, and it compounds. Bifrost's whole design is aimed at keeping that per-hop tax close to zero, which is the real, practical meaning behind "50x faster than LiteLLM" — it matters most exactly where agentic and high-traffic systems live.
 
 ## Sources
 
